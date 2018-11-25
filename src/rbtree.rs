@@ -1,11 +1,3 @@
-use std::rc::Rc;
-
-fn rc_ptrs_equal <K>(left: Rc<K>, right: Rc<K>) -> bool {
-    let a = left.as_ref() as *const _;
-    let b = right.as_ref() as *const _;
-    return a == b;
-}
-
 struct Node<K:Ord, V> {
     key: K,
     val: *const V,
@@ -16,7 +8,7 @@ struct Node<K:Ord, V> {
     right: nodeptr_t<K,V>,
 }
 
-type nodeptr_t<K,V> = Option<Rc<Node<K,V>>>;
+type nodeptr_t<K,V> = Option<*const Node<K,V>>;
 
 impl<K:Ord, V> Node<K, V> {
     fn new(key: K, val: *const V, color: usize, size: usize) -> Self {
@@ -29,6 +21,14 @@ impl<K:Ord, V> Node<K, V> {
             left: None,
             right: None,
         }
+    }
+
+    fn is_red(&self) -> bool {
+        return self.color == 1;
+    }
+    
+    fn size(&self) -> usize {
+        return self.size;
     }
 }
 
@@ -43,212 +43,90 @@ impl<K:Ord,V> RBTree<K,V> {
         }
     }
 
-    fn is_node_red(node_opt: nodeptr_t<K,V>) -> bool {
-        if let Some (node_ptr) = node_opt {
-            return node_ptr.color == 1;
+    fn is_node_red(&self, node: nodeptr_t<K,V>) -> bool {
+        if let Some(n) = node {
+            return (*n).is_red();
         }
         return false;
     }
-    
-    fn size(node_opt: nodeptr_t<K,V>) -> usize {
-        if let Some (node_ptr) = node_opt {
-            return node_ptr.size;
-        }
-        return 0;
-    }
-    
-    fn put(&self, root: &mut nodeptr_t<K,V>, key: K, val: *const V) -> nodeptr_t<K,V> {
-        if let Some(rptr) = root {
-            if let Some(mut r) = Rc::get_mut(rptr) {
-                if key == r.key {
-                    r.val = val;
-                } else if key < r.key {
-                    self.put(&mut r.left, key, val);
-                } else {
-                    self.put(&mut r.right, key, val);
+
+    fn is_child_node_red(&self, node: nodeptr_t<K,V>, side: usize) -> bool {
+        if let Some(n) = node {
+            if side == 0 {
+                if let Some(c) = (*n).left {
+                    return (*c).is_red();
+                }
+            } else if side == 1 {
+                if let Some(c) = (*n).right {
+                    return (*c).is_red();
                 }
             }
-            // TODO fix up
+        }
+        return false;
+    }
+
+    fn rotate_left(&self, nodeptr: *const Node<K,V>) {
+    }
+
+    fn rotate_right(&self, nodeptr: *const Node<K,V>) -> *const Node<K,V> {
+        // Clones??
+        if let Some(xptr) = (*nodeptr).left {
+            (*nodeptr).left = (*xptr).right;
+            (*xptr).right = Some(nodeptr);
+            return xptr;
+        } else {
+            return nodeptr;
+        }
+    }
+
+    fn flip_colors(&self, nodeptr: *const Node<K,V>) {
+    }
+    
+    fn put(&mut self, root: nodeptr_t<K,V>, key: K, val: *const V) -> nodeptr_t<K,V> {
+        if let Some(r) = root {
+            if key == (*r).key {
+                (*r).val = val;
+            } else if key < (*r).key {
+                self.put((*r).left, key, val);
+            } else {
+                self.put((*r).right, key, val);
+            }
+            // TODO fix up tree
+            if self.is_node_red((*r).right) && !self.is_node_red((*r).left) {
+                self.rotate_left(r);
+            }
+            if self.is_node_red((*r).right) && !self.is_child_node_red((*r).left, 0) {
+                r = self.rotate_right(r);
+            }
+            if self.is_node_red((*r).left) && self.is_node_red((*r).right) {
+                self.flip_colors(r);
+            }
             return None;
         } else {
-            return Some(Rc::new(Node::new(key, val, 1, 1)));
+            return Some(&Node::new(key, val, 1, 1));
         }
     }
 
     pub fn insert(&mut self, key: K, val: *const V) {
-        if let Some(new_root) = self.put(&mut self.root.clone(), key, val) {
+        if let Some(new_root) = self.put(self.root, key, val) {
             self.root = Some(new_root);
         }
-        if let Some(rptr) = &mut self.root {
-            if let Some(mut r) = Rc::get_mut(rptr) {
-                r.color = 0;
-            }
+        if let Some(rptr) = self.root {
+            (*rptr).color = 0;
         } 
     }
 
     pub fn find(&self, key: K) -> Option<*const V> {
-        let mut x_opt = &self.root;
+        let x_opt = self.root;
         while let Some(x) = x_opt {
-            if key == x.key {
-                return Some(x.val);
-            } else if key < x.key {
-                x_opt = &x.left;
+            if key == (*x).key {
+                return Some((*x).val);
+            } else if key < (*x).key {
+                x_opt = (*x).left;
             } else {
-                x_opt = &x.right;
+                x_opt = (*x).right;
             }
         }
         return None;
     }
 }
- 
-    /*fn child(&self, isright: bool) -> Option<Rc<Node<K>>> {
-        return if isright {self.children[0]} else {self.children[1]};
-    }
-    fn parent(&self) -> Option<Rc<Node<K>>> {
-        return self.parent;
-    }
-    fn black_parent(&self) -> Option<Rc<Node<K>>> {
-        if let Some (p) = self.parent {
-            let node = Node::new(p.val, 0);
-            node.children = p.children;
-            return Some (Rc::new(node));
-        }
-        return None;
-    }
-    fn red(&self) -> bool {
-        return self.color==1;
-    }
-    fn children_same_color() -> bool {
-        return false;
-    }
-    fn find_child(&self, node: Rc<Node<K>>) -> usize {
-        if let Some(child) = node.children[1] {
-            if rc_ptrs_equal(child, node) {
-                return 1;
-            }
-        }
-        return 0;
-    }
-    fn load_color(&mut self, myNode: Rc<Node<K>>) {
-        //assert (!red);
-        let pOpt = self.black_parent();
-        if let Some(p) = pOpt {
-            if let Some(child) = p.children[p.find_child(myNode)] {
-                if child.red() {
-                    self.color = 1;
-                }
-            }
-        }
-    }
-    fn change_color(&mut self, color: i32) {
-        self.color = color;
-    }
-    fn reverse_color(&mut self) {
-        self.color ^ 1;
-    }
-    fn flip(&mut self) {
-        if let Some(c0) = self.children[0] {
-            c0.reverse_color();
-        }
-        if let Some(c1) = self.children[1] {
-            c1.reverse_color();
-        }
-        self.reverse_color();
-    }
-    /*fn set_child(bool is_right, Rc<Node<K>> x, Rc<Node<K>> root) -> Rc<Node<K>> {
-    }*/
-    
-    fn rotate(&mut self, myNode: Rc<Node<K>>, side: usize) {
-        let old_color = if self.red() {1} else {0};
-        if let Some(child) = self.children[side^1] {
-            if let Some(gc) = child.children[side] {
-                if rc_ptrs_equal(child, gc) {
-                    gc.parent = Some(myNode);
-                }
-                gc.change_color(1);
-            } 
-            child.parent = self.parent;
-            child.change_color(old_color);
-        }
-        self.parent = self.children[side^1];
-    }
-    fn rotate_left() {}
-    fn rotate_right() {}
-    
-    fn size() -> usize { return 0; }
-    /*fn check(Rc<Node<K>> parent, int this_black_height, int black_height, 
-             Rc<Node<K>> root, Rc<Node<K>> begin, Rc<Node<K>> end) -> usize {}*/
-}
-
-pub struct RBKree<K:Ord> {
-    root_: Option<Rc<Node<K>>>,
-    limits_ : [Option<Rc<Node<K>>>;2],
-}
-
-impl<K:Ord> RBKree<K> {
-    pub fn new() -> Self {
-        RBKree {
-            root_: None,
-            limit_: [None, None],
-        }
-    }
-    pub fn insert(&mut self, val: K) {
-        let mut side = 0;
-        return;
-    }
-
-    pub fn insert_commit(&mut self, val: K, mut p: Rc<Node<K>>, side: usize) {
-        // link in new node; it's red
-        let mut node = Rc::new(Node::new(val, 1));
-        node.parent = Some (p);
-        node.children[0] = None;
-        node.children[1] = None; 
-
-        // maybe set limits
-        p.children[side] = Some (node.clone());
-        if let Some(limit) = self.limits_[side] {
-            if rc_ptrs_equal(limit, p) {
-                self.limits_[side] = Some(node.clone()); 
-            }
-        } 
-        else {
-            self.root_ = Some(node.clone());
-            self.limits_[0] = Some(node.clone());
-            self.limits_[1] = Some(node.clone());
-        }
-
-        // ignore reshaping for now
-        // flip up the tree
-        // invariant: we are looking at the `side` of `p`
-        while p.red() {
-            let gpOpt = p.black_parent();
-            if let Some (gp) = gpOpt {
-                let z = gp.clone();
-                if let Some(child0) = gp.children[0] {
-                    if let Some(child1) = gp.children[0] {
-                        if child0.red() && child1.red() {
-                            gp.flip();
-                            z = gp.clone();
-                            if let Some (zbp) = z.black_parent() {
-                                zbp.load_color(zbp);
-                                p = zbp.clone();
-                            } 
-                        }
-                    }
-                } else {
-                    let gpside = gp.find_child(p);
-                    if gpside != side {
-                        p.rotate(p, gpside);
-                        gp.children[gpside] = Some(p);
-                    } 
-                    gp.rotate(gp,!gpside);
-                    z = gp.clone();
-                    if let Some (zbp) = z.black_parent() {
-                        p = zbp.clone();
-                    }
-                }
-            }
-            side = p.find_child(gp);
-            p.set_child(side, z, root_);
-        }
-    }        */
