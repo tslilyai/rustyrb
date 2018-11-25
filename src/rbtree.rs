@@ -1,3 +1,4 @@
+#[derive(Debug)]
 struct Node<K:Ord+Clone, V> {
     key: K,
     val: *const V,
@@ -147,24 +148,28 @@ impl<K:Ord+Clone,V> RBTree<K,V> {
         return r;
     }
 
-    fn put(root: NodeptrT<K,V>, key: K, val: *const V) -> NodeptrT<K,V> {
+    fn put(root: NodeptrT<K,V>, key: K, val: *const V, iter: usize) -> NodeptrT<K,V> {
         if let Some(mut r) = root {
             if key == (*r).key {
                 (*r).val = val;
             } else if key < (*r).key {
-                (*r).left = RBTree::put((*r).left.clone(), key, val);
+                (*r).left = RBTree::put((*r).left.clone(), key, val, iter+1);
             } else {
-                (*r).right = RBTree::put((*r).right.clone(), key, val);
+                (*r).right = RBTree::put((*r).right.clone(), key, val, iter+1);
             }
             r = RBTree::balance(r, true); 
             return Some(r);
         } else {
+            println!("New in iter! {}", iter);
             return Some(Box::new(Node::new(key, val, 1, 1)));
         }
     }
    
     pub fn insert(&mut self, key: K, val: *const V) {
-        if let Some(new_root) = RBTree::put(self.root.clone(), key, val) {
+        if let None = self.root.clone() {
+            println!("Clone is None");
+        }
+        if let Some(new_root) = RBTree::put(self.root.clone(), key, val, 0) {
             self.root = Some(new_root);
             println!("Inserted new root of size {}", self.size());
         }
