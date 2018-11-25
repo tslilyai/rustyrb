@@ -1,4 +1,4 @@
-struct Node<K:Ord, V> {
+struct Node<K:Ord+Clone, V> {
     key: K,
     val: *const V,
     color: usize,
@@ -8,9 +8,23 @@ struct Node<K:Ord, V> {
     right: nodeptr_t<K,V>,
 }
 
-type nodeptr_t<K,V> = Option<*const Node<K,V>>;
+type nodeptr_t<K,V> = Option<Box<Node<K,V>>>;
 
-impl<K:Ord, V> Node<K, V> {
+impl<K:Ord+Clone, V> Clone for Node<K, V> {
+    fn clone(&self) -> Self{
+        Node {
+            key: Clone::clone(&self.key),
+            val: Clone::clone(&self.val),
+            color: Clone::clone(&self.color),
+            size: Clone::clone(&self.size),
+            parent: Clone::clone(&self.parent),
+            left: Clone::clone(&self.left),
+            right: Clone::clone(&self.right),
+        }
+    }
+}
+
+impl<K:Ord+Clone, V> Node<K, V> {
     fn new(key: K, val: *const V, color: usize, size: usize) -> Self {
         Node {
             key: key,
@@ -32,32 +46,32 @@ impl<K:Ord, V> Node<K, V> {
     }
 }
 
-pub struct RBTree<K:Ord, V> {
+pub struct RBTree<K:Ord+Clone, V> {
     root: nodeptr_t<K,V>,
 }
 
-impl<K:Ord,V> RBTree<K,V> {
+impl<K:Ord+Clone,V> RBTree<K,V> {
     pub fn new() -> Self {
         RBTree {
             root: None,
         }
     }
 
-    fn is_node_red(&self, node: nodeptr_t<K,V>) -> bool {
+    fn is_node_red(node: &nodeptr_t<K,V>) -> bool {
         if let Some(n) = node {
-            return (*n).is_red();
+            return n.is_red();
         }
         return false;
     }
 
-    fn is_child_node_red(&self, node: nodeptr_t<K,V>, side: usize) -> bool {
+    fn is_child_node_red(node: &nodeptr_t<K,V>, side: usize) -> bool {
         if let Some(n) = node {
             if side == 0 {
-                if let Some(c) = (*n).left {
+                if let Some(ref c) = n.left {
                     return (*c).is_red();
                 }
             } else if side == 1 {
-                if let Some(c) = (*n).right {
+                if let Some(ref c) = n.right {
                     return (*c).is_red();
                 }
             }
@@ -65,66 +79,71 @@ impl<K:Ord,V> RBTree<K,V> {
         return false;
     }
 
-    fn rotate_left(&self, nodeptr: *const Node<K,V>) {
+    fn rotate_left(nodeptr: Box<Node<K,V>>) -> Box<Node<K,V>> {
+        return nodeptr;
     }
 
-    fn rotate_right(&self, nodeptr: *const Node<K,V>) -> *const Node<K,V> {
-        // Clones??
-        if let Some(xptr) = (*nodeptr).left {
-            (*nodeptr).left = (*xptr).right;
-            (*xptr).right = Some(nodeptr);
+    fn rotate_right(nodeptr: Box<Node<K,V>>) -> Box<Node<K,V>> {
+        if let Some(mut nptr) = (*nodeptr).left {
+            let mut xptr = nptr.clone();
+            let mut x = (*nptr).clone();
+            (*nptr).left = x.right;
+            (*xptr).right = Some(nptr);
             return xptr;
         } else {
             return nodeptr;
         }
     }
 
-    fn flip_colors(&self, nodeptr: *const Node<K,V>) {
+    fn flip_colors(nodeptr: Box<Node<K,V>>) -> Box<Node<K,V>> {
+        return nodeptr;
     }
-    
-    fn put(&mut self, root: nodeptr_t<K,V>, key: K, val: *const V) -> nodeptr_t<K,V> {
-        if let Some(r) = root {
+
+    fn put(root: nodeptr_t<K,V>, key: K, val: *const V) -> nodeptr_t<K,V> {
+        if let Some(mut r) = root {
             if key == (*r).key {
                 (*r).val = val;
             } else if key < (*r).key {
-                self.put((*r).left, key, val);
+                RBTree::put((*r).left.clone(), key, val);
             } else {
-                self.put((*r).right, key, val);
+                RBTree::put((*r).right.clone(), key, val);
             }
             // TODO fix up tree
-            if self.is_node_red((*r).right) && !self.is_node_red((*r).left) {
-                self.rotate_left(r);
+            let r_clone = r.clone();
+            if RBTree::is_node_red(&(*r_clone).right) && !RBTree::is_node_red(&(*r_clone).left) {
+                r = RBTree::rotate_left(r.clone());
             }
-            if self.is_node_red((*r).right) && !self.is_child_node_red((*r).left, 0) {
-                r = self.rotate_right(r);
+            if RBTree::is_node_red(&(*r).right) && !RBTree::is_child_node_red(&(*r).left, 0) {
+                r = RBTree::rotate_right(r.clone());
             }
-            if self.is_node_red((*r).left) && self.is_node_red((*r).right) {
-                self.flip_colors(r);
+            if RBTree::is_node_red(&(*r).left) &&  RBTree::is_node_red(&(*r).right) {
+                r = RBTree::flip_colors(r.clone());
             }
             return None;
         } else {
-            return Some(&Node::new(key, val, 1, 1));
+            return Some(Box::new(Node::new(key, val, 1, 1)));
         }
     }
-
+   
     pub fn insert(&mut self, key: K, val: *const V) {
-        if let Some(new_root) = self.put(self.root, key, val) {
+        if let Some(new_root) = RBTree::put(self.root.clone(), key, val) {
             self.root = Some(new_root);
         }
-        if let Some(rptr) = self.root {
+        if let Some(ref mut rptr) = &mut self.root {
             (*rptr).color = 0;
         } 
     }
 
     pub fn find(&self, key: K) -> Option<*const V> {
-        let x_opt = self.root;
+        let mut x_opt = &self.root;
         while let Some(x) = x_opt {
             if key == (*x).key {
-                return Some((*x).val);
+                let found = (*x).val;
+                return Some(found);
             } else if key < (*x).key {
-                x_opt = (*x).left;
+                x_opt = &(*x).left;
             } else {
-                x_opt = (*x).right;
+                x_opt = &(*x).right;
             }
         }
         return None;
