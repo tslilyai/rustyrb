@@ -80,16 +80,42 @@ impl<K:Ord+Clone,V> RBTree<K,V> {
     }
 
     fn rotate_left(nodeptr: Box<Node<K,V>>) -> Box<Node<K,V>> {
-        return nodeptr;
+        if let Some(nptr_left) = nodeptr.left.clone() {
+            if let Some(mut nptr_right) = nodeptr.right.clone() {
+                let mut xptr = nptr_right.clone();
+              
+                let mut nodeptr_clone = nodeptr.clone();
+                nodeptr_clone.right = xptr.left.clone();
+                nodeptr_clone.color = 1;
+                nodeptr_clone.size = nptr_left.size + nptr_right.size + 1;
+
+                xptr.left = Some(nodeptr_clone);
+                xptr.color = nodeptr.color;
+                xptr.size = nodeptr.size;
+                return xptr;
+            }
+            return nptr_left;
+        } else {
+            return nodeptr;
+        }    
     }
 
     fn rotate_right(nodeptr: Box<Node<K,V>>) -> Box<Node<K,V>> {
-        if let Some(mut nptr) = (*nodeptr).left {
-            let mut xptr = nptr.clone();
-            let mut x = (*nptr).clone();
-            (*nptr).left = x.right;
-            (*xptr).right = Some(nptr);
-            return xptr;
+        if let Some(nptr_left) = nodeptr.left.clone() {
+            if let Some(mut nptr_right) = nodeptr.right.clone() {
+                let mut xptr = nptr_left.clone();
+              
+                let mut nodeptr_clone = nodeptr.clone();
+                nodeptr_clone.left = xptr.right.clone();
+                nodeptr_clone.color = 1;
+                nodeptr_clone.size = nptr_left.size + nptr_right.size + 1;
+
+                xptr.right = Some(nodeptr_clone);
+                xptr.color = nodeptr.color;
+                xptr.size = nodeptr.size;
+                return xptr;
+            }
+            return nptr_left;
         } else {
             return nodeptr;
         }
