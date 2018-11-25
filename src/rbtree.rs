@@ -104,22 +104,21 @@ impl<K:Ord+Clone,V> RBTree<K,V> {
             if key == (*r).key {
                 (*r).val = val;
             } else if key < (*r).key {
-                RBTree::put((*r).left.clone(), key, val);
+                (*r).left = RBTree::put((*r).left.clone(), key, val);
             } else {
-                RBTree::put((*r).right.clone(), key, val);
+                (*r).right = RBTree::put((*r).right.clone(), key, val);
             }
-            // TODO fix up tree
-            let r_clone = r.clone();
-            if RBTree::is_node_red(&(*r_clone).right) && !RBTree::is_node_red(&(*r_clone).left) {
-                r = RBTree::rotate_left(r.clone());
+            // fix up tree
+            if RBTree::is_node_red(&(*r).right) && !RBTree::is_node_red(&(*r).left) {
+                r = RBTree::rotate_left(r);
             }
             if RBTree::is_node_red(&(*r).right) && !RBTree::is_child_node_red(&(*r).left, 0) {
-                r = RBTree::rotate_right(r.clone());
+                r = RBTree::rotate_right(r);
             }
             if RBTree::is_node_red(&(*r).left) &&  RBTree::is_node_red(&(*r).right) {
-                r = RBTree::flip_colors(r.clone());
+                r = RBTree::flip_colors(r);
             }
-            return None;
+            return Some(r);
         } else {
             return Some(Box::new(Node::new(key, val, 1, 1)));
         }
