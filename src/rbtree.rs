@@ -3,12 +3,12 @@ struct Node<K:Ord+Clone, V> {
     val: *const V,
     color: usize,
     size: usize,
-    parent: nodeptr_t<K,V>,
-    left: nodeptr_t<K,V>,
-    right: nodeptr_t<K,V>,
+    parent: NodeptrT<K,V>,
+    left: NodeptrT<K,V>,
+    right: NodeptrT<K,V>,
 }
 
-type nodeptr_t<K,V> = Option<Box<Node<K,V>>>;
+type NodeptrT<K,V> = Option<Box<Node<K,V>>>;
 
 impl<K:Ord+Clone, V> Clone for Node<K, V> {
     fn clone(&self) -> Self{
@@ -47,7 +47,7 @@ impl<K:Ord+Clone, V> Node<K, V> {
 }
 
 pub struct RBTree<K:Ord+Clone, V> {
-    root: nodeptr_t<K,V>,
+    root: NodeptrT<K,V>,
 }
 
 impl<K:Ord+Clone,V> RBTree<K,V> {
@@ -57,14 +57,14 @@ impl<K:Ord+Clone,V> RBTree<K,V> {
         }
     }
 
-    fn is_node_red(node: &nodeptr_t<K,V>) -> bool {
+    fn is_node_red(node: &NodeptrT<K,V>) -> bool {
         if let Some(n) = node {
             return n.is_red();
         }
         return false;
     }
 
-    fn is_child_node_red(node: &nodeptr_t<K,V>, side: usize) -> bool {
+    fn is_child_node_red(node: &NodeptrT<K,V>, side: usize) -> bool {
         if let Some(n) = node {
             if side == 0 {
                 if let Some(ref c) = n.left {
@@ -125,7 +125,7 @@ impl<K:Ord+Clone,V> RBTree<K,V> {
         return nodeptr;
     }
 
-    fn put(root: nodeptr_t<K,V>, key: K, val: *const V) -> nodeptr_t<K,V> {
+    fn put(root: NodeptrT<K,V>, key: K, val: *const V) -> NodeptrT<K,V> {
         if let Some(mut r) = root {
             if key == (*r).key {
                 (*r).val = val;
