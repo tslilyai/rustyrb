@@ -1,0 +1,6 @@
+[package]
+name = "rustyrbtree"
+version = "0.1.0"
+authors = ["Lily Tsai <tslilyai@mit.edu>"]
+
+[dependencies]
