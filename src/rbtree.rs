@@ -121,8 +121,12 @@ impl<K:Ord+Clone,V> RBTree<K,V> {
         }
     }
 
-    fn flip_colors(nodeptr: Box<Node<K,V>>) -> Box<Node<K,V>> {
-        return nodeptr;
+    fn flip_colors(nodeptr: &mut Box<Node<K,V>>) {
+        if nodeptr.color == 0 {
+            nodeptr.color = 1;
+        } else {
+            nodeptr.color = 0;
+        }
     }
 
     fn put(root: NodeptrT<K,V>, key: K, val: *const V) -> NodeptrT<K,V> {
@@ -142,7 +146,7 @@ impl<K:Ord+Clone,V> RBTree<K,V> {
                 r = RBTree::rotate_right(r);
             }
             if RBTree::is_node_red(&(*r).left) &&  RBTree::is_node_red(&(*r).right) {
-                r = RBTree::flip_colors(r);
+                RBTree::flip_colors(&mut r);
             }
             return Some(r);
         } else {
