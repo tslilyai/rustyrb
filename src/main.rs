@@ -8,11 +8,11 @@ fn main() {
         tree.insert(i, &x);
     }
     for i in 0..100 {
-        let val = tree.find(i);
+        let val = tree.find(&i);
         if let Some(v) = val {
-            unsafe {println!("Some {}!", *v);}
+            unsafe {println!("{}: Some {}!", i, *v);}
         } else {
-            println!("No {}!", 0);
+            println!("No {}!", i);
         }
     }
     println!("Tree size : {}", tree.size());

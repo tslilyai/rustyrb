@@ -62,7 +62,168 @@ impl<K:Ord+Clone+Debug,V> RBTree<K,V> {
             root: None,
         }
     }
+    
+    /***************************************************************************
+    *  Insertion.
+    ***************************************************************************/
 
+    fn put(root: NodeptrT<K,V>, key: K, val: *const V) -> NodeptrT<K,V> {
+        if let Some(mut r) = root {
+            if key == (*r).key {
+                (*r).val = val;
+            } else if key < (*r).key {
+                (*r).left = RBTree::put((*r).left.clone(), key, val);
+            } else {
+                (*r).right = RBTree::put((*r).right.clone(), key, val);
+            }
+            r = RBTree::balance(&r, true); 
+            return Some(r);
+        } else {
+            return Some(Box::new(Node::new(key, val, 1, 1)));
+        }
+    }
+   
+
+    pub fn insert(&mut self, key: K, val: *const V) {
+        if let None = self.root.clone() {
+            println!("Clone is None");
+        }
+        if let Some(new_root) = RBTree::put(self.root.clone(), key, val) {
+            self.root = Some(new_root);
+        }
+        if let Some(ref mut rptr) = &mut self.root {
+            (*rptr).color = 0;
+        } 
+    }
+ 
+    /***************************************************************************
+    *  Delete.
+    ***************************************************************************/
+    pub fn delete(&mut self, key: K) { 
+        if !self.contains(&key) {
+            return;
+        }
+
+        // if both children of root are black, set root to red
+        if let Some(ref mut r) = self.root {
+            if !RBTree::is_node_red(&r.left) && !RBTree::is_node_red(&r.right) {
+                r.color = 1;
+            }
+        }
+
+        // delete and set new root
+        self.root = self.delete_helper(&self.root, key);
+        if let Some(ref mut r) = self.root {
+            r.color = 0;
+        } 
+    }
+
+    fn move_red_left(h: &mut Box<Node<K,V>>) {
+        RBTree::flip_colors(h);
+        if RBTree::is_child_node_red(&h.right, 0) {
+            if let Some(mut right) = h.right.clone() {
+                RBTree::rotate_right(&mut right);
+                h.right = Some(right);
+                RBTree::rotate_left(h);
+                RBTree::flip_colors(h);
+            }
+        }
+    }
+
+    fn move_red_right(h : &mut Box<Node<K,V>>) {
+        RBTree::flip_colors(h);
+        if RBTree::is_child_node_red(&h.left, 0) {
+            RBTree::rotate_right(h);
+            RBTree::flip_colors(h);
+        }    
+    }
+
+    fn min(hptr: &NodeptrT<K,V>) -> &NodeptrT<K,V> {
+        if let Some(h) = hptr {
+            return RBTree::min(&h.left);
+        }
+        return hptr;
+    }
+
+    fn delete_min(hptr: &mut NodeptrT<K,V>) -> NodeptrT<K,V> {
+        if let Some(ref mut h) = hptr {
+            if let Some(ref left) = h.left.clone() {
+                if !left.is_red() && !RBTree::is_node_red(&left.left) {
+                    RBTree::move_red_left(h);
+                }
+                h.left = RBTree::delete_min(&mut h.left);
+                return Some(RBTree::balance(&h, false));
+            } else {
+                return None;
+            }
+        } else {
+            return None;
+        }
+    }
+
+    pub fn delete_helper(&self, hptr: &NodeptrT<K,V>, key: K) -> NodeptrT<K,V> { 
+        if let Some(mut h) = hptr.clone() {
+            if key < h.key  {
+                if !RBTree::is_node_red(&h.left) && !RBTree::is_child_node_red(&h.left, 0) {
+                    RBTree::move_red_left(&mut h);
+                }
+                h.left = self.delete_helper(&h.left, key);
+            } else {
+                if RBTree::is_node_red(&h.left) {
+                    RBTree::rotate_right(&mut h);
+                }
+                if key == h.key {
+                    if let None = h.right {
+                        return None;
+                    }
+                }
+                if !RBTree::is_node_red(&h.right) && !RBTree::is_child_node_red(&h.right, 0) {
+                    RBTree::move_red_right(&mut h);
+                }
+                if key == h.key {
+                    // this must be the case because h.right is not None
+                    if let Some(x) = RBTree::min(&h.right.clone()) {
+                        h.key = x.key.clone();
+                        h.val = x.val.clone();
+                        h.right = RBTree::delete_min(&mut h.right);
+                    }
+                }
+                else {
+                    h.right = self.delete_helper(&h.right, key);
+                }
+            }
+            return Some(RBTree::balance(&h, false));
+        }
+        return None;
+    }
+ 
+    /***************************************************************************
+    *  Find.
+    ***************************************************************************/
+    pub fn find(&self, key: &K) -> Option<*const V> {
+        let mut x_opt = &self.root;
+        while let Some(x) = x_opt {
+            if *key == (*x).key {
+                let found = (*x).val;
+                return Some(found);
+            } else if *key < (*x).key {
+                x_opt = &(*x).left;
+            } else {
+                x_opt = &(*x).right;
+            }
+        }
+        return None;
+    }
+    pub fn contains(&self, key: &K) -> bool {
+        if let Some(x) = self.find(key) {
+            return true;
+        } 
+        return false;
+    }
+
+   /***************************************************************************
+    *  Rotation and Coloring Functions.
+    ***************************************************************************/
     fn is_node_red(node: &NodeptrT<K,V>) -> bool {
         if let Some(n) = node {
             return n.is_red();
@@ -85,7 +246,7 @@ impl<K:Ord+Clone+Debug,V> RBTree<K,V> {
         return false;
     }
 
-    fn rotate_left(nodeptr: Box<Node<K,V>>) -> Box<Node<K,V>> {
+    fn rotate_left(nodeptr: &mut Box<Node<K,V>>) {
         if let Some(mut xptr) = nodeptr.right.clone() {
             let mut nodeptr_clone = nodeptr.clone();
             nodeptr_clone.right = xptr.left.clone();
@@ -96,13 +257,11 @@ impl<K:Ord+Clone+Debug,V> RBTree<K,V> {
             xptr.left = Some(nodeptr_clone);
             xptr.color = nodeptr.color;
             xptr.size = nodeptr.size;
-            return xptr;
-        } else {
-            return nodeptr;
-        }    
+            *nodeptr = xptr;
+        }
     }
 
-    fn rotate_right(nodeptr: Box<Node<K,V>>) -> Box<Node<K,V>> {
+    fn rotate_right(nodeptr: &mut Box<Node<K,V>>) {
         if let Some(mut xptr) = nodeptr.left.clone() {
             let mut nodeptr_clone = nodeptr.clone();
             nodeptr_clone.left = xptr.right.clone();
@@ -113,9 +272,7 @@ impl<K:Ord+Clone+Debug,V> RBTree<K,V> {
             xptr.right = Some(nodeptr_clone);
             xptr.color = nodeptr.color;
             xptr.size = nodeptr.size;
-            return xptr;
-        } else {
-            return nodeptr;
+            *nodeptr = xptr;
         }
     }
     
@@ -136,18 +293,18 @@ impl<K:Ord+Clone+Debug,V> RBTree<K,V> {
         RBTree::set_color(&mut nodeptr.right, color);
     }
 
-    fn balance(rbox: Box<Node<K,V>>, is_put: bool) -> Box<Node<K,V>> {
+    fn balance(rbox: &Box<Node<K,V>>, is_put: bool) -> Box<Node<K,V>> {
         println!("balancing {:?}", rbox.key);
         let mut r = rbox.clone();
         if RBTree::is_node_red(&(*r).right) {
             if !is_put || (is_put && !RBTree::is_node_red(&(*r).left)) {
                 println!("rotate left {:?}", r.key);
-                r = RBTree::rotate_left(r);
+                RBTree::rotate_left(&mut r);
             }
         }
         if RBTree::is_node_red(&(*r).left) && RBTree::is_child_node_red(&(*r).left, 0) {
             println!("rotate right {:?}", r.key);
-            r = RBTree::rotate_right(r);
+            RBTree::rotate_right(&mut r);
         }
         if RBTree::is_node_red(&(*r).left) &&  RBTree::is_node_red(&(*r).right) {
             println!("flipping colors of {:?} from {}", r.key, r.color);
@@ -156,63 +313,6 @@ impl<K:Ord+Clone+Debug,V> RBTree<K,V> {
         r.size = Node::size(&r.right) + Node::size(&r.left) + 1;
         return r;
     }
-
-    fn put(root: NodeptrT<K,V>, key: K, val: *const V) -> NodeptrT<K,V> {
-        if let Some(mut r) = root {
-            if key == (*r).key {
-                (*r).val = val;
-            } else if key < (*r).key {
-                (*r).left = RBTree::put((*r).left.clone(), key, val);
-            } else {
-                (*r).right = RBTree::put((*r).right.clone(), key, val);
-            }
-            r = RBTree::balance(r, true); 
-            return Some(r);
-        } else {
-            return Some(Box::new(Node::new(key, val, 1, 1)));
-        }
-    }
-   
-    fn print_tree(root: &NodeptrT<K,V>, iter: usize) {
-        if let Some(x) = root {
-            RBTree::print_tree(&x.left, iter+1);
-            print!("--Iter{}, {:?}:({},{})--", iter, x.key, x.size, x.color);
-            RBTree::print_tree(&x.right, iter+1);
-        } else {
-            print!("--NULL--");
-        }
-    }
- 
-    pub fn insert(&mut self, key: K, val: *const V) {
-        if let None = self.root.clone() {
-            println!("Clone is None");
-        }
-        if let Some(new_root) = RBTree::put(self.root.clone(), key, val) {
-            self.root = Some(new_root);
-        }
-        if let Some(ref mut rptr) = &mut self.root {
-            (*rptr).color = 0;
-        } 
-        println!("------PRINTING TREE-------");
-        RBTree::print_tree(&self.root, 0);
-        println!("\n");
-    }
-
-    pub fn find(&self, key: K) -> Option<*const V> {
-        let mut x_opt = &self.root;
-        while let Some(x) = x_opt {
-            if key == (*x).key {
-                let found = (*x).val;
-                return Some(found);
-            } else if key < (*x).key {
-                x_opt = &(*x).left;
-            } else {
-                x_opt = &(*x).right;
-            }
-        }
-        return None;
-    }
-
 
    /***************************************************************************
     *  Utility functions.
@@ -242,6 +342,17 @@ impl<K:Ord+Clone+Debug,V> RBTree<K,V> {
     /***************************************************************************
     *  Check integrity of red-black tree data structure.
     ***************************************************************************/
+    fn print_tree(root: &NodeptrT<K,V>, iter: usize) {
+        if let Some(x) = root {
+            RBTree::print_tree(&x.left, iter+1);
+            print!("--Iter{}, {:?}:({},{})--", iter, x.key, x.size, x.color);
+            RBTree::print_tree(&x.right, iter+1);
+        } else {
+            print!("--NULL--");
+        }
+    }
+ 
+
     pub fn check(&self) -> bool {
         if !self.is_bst() {
             println!("Not in symmetric order");
@@ -258,6 +369,7 @@ impl<K:Ord+Clone+Debug,V> RBTree<K,V> {
         if !self.is_balanced() {
             println!("Not balanced");
         }
+        RBTree::print_tree(&self.root, 0);
         return self.is_bst() 
             && self.is_size_consistent() 
             && self.is_rank_consistent() 
