@@ -214,7 +214,7 @@ impl<K:Ord+Clone+Debug,V> RBTree<K,V> {
         return None;
     }
     pub fn contains(&self, key: &K) -> bool {
-        if let Some(x) = self.find(key) {
+        if let Some(_) = self.find(key) {
             return true;
         } 
         return false;
