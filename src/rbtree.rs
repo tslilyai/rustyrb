@@ -1,5 +1,7 @@
+use std::fmt::Debug;
+
 #[derive(Debug)]
-struct Node<K:Ord+Clone, V> {
+struct Node<K:Ord+Clone+Debug, V> {
     key: K,
     val: *const V,
     color: usize,
@@ -11,7 +13,7 @@ struct Node<K:Ord+Clone, V> {
 
 type NodeptrT<K,V> = Option<Box<Node<K,V>>>;
 
-impl<K:Ord+Clone, V> Clone for Node<K, V> {
+impl<K:Ord+Clone+Debug, V> Clone for Node<K, V> {
     fn clone(&self) -> Self{
         Node {
             key: Clone::clone(&self.key),
@@ -25,7 +27,7 @@ impl<K:Ord+Clone, V> Clone for Node<K, V> {
     }
 }
 
-impl<K:Ord+Clone, V> Node<K, V> {
+impl<K:Ord+Clone+Debug, V> Node<K, V> {
     fn new(key: K, val: *const V, color: usize, size: usize) -> Self {
         Node {
             key: key,
@@ -50,11 +52,11 @@ impl<K:Ord+Clone, V> Node<K, V> {
     }
 }
 
-pub struct RBTree<K:Ord+Clone, V> {
+pub struct RBTree<K:Ord+Clone+Debug, V> {
     root: NodeptrT<K,V>,
 }
 
-impl<K:Ord+Clone,V> RBTree<K,V> {
+impl<K:Ord+Clone+Debug,V> RBTree<K,V> {
     pub fn new() -> Self {
         RBTree {
             root: None,
@@ -116,29 +118,39 @@ impl<K:Ord+Clone,V> RBTree<K,V> {
             return nodeptr;
         }
     }
+    
+    fn set_color(nodeptr: &mut NodeptrT<K,V>, color: usize) {
+        if let Some(ref mut n) = nodeptr {
+            n.color = color;
+        }
+    }
 
     fn flip_colors(nodeptr: &mut Box<Node<K,V>>) {
+        let color = nodeptr.color;
         if nodeptr.color == 0 {
             nodeptr.color = 1;
         } else {
             nodeptr.color = 0;
         }
+        RBTree::set_color(&mut nodeptr.left, color);
+        RBTree::set_color(&mut nodeptr.right, color);
     }
 
-    fn balance(r: Box<Node<K,V>>, is_put: bool) -> Box<Node<K,V>> {
-        let mut r = r.clone();
+    fn balance(rbox: Box<Node<K,V>>, is_put: bool) -> Box<Node<K,V>> {
+        println!("balancing {:?}", rbox.key);
+        let mut r = rbox.clone();
         if RBTree::is_node_red(&(*r).right) {
             if !is_put || (is_put && !RBTree::is_node_red(&(*r).left)) {
-                println!("rotate left");
+                println!("rotate left {:?}", r.key);
                 r = RBTree::rotate_left(r);
             }
         }
         if RBTree::is_node_red(&(*r).left) && RBTree::is_child_node_red(&(*r).left, 0) {
-            println!("rotate right");
+            println!("rotate right {:?}", r.key);
             r = RBTree::rotate_right(r);
         }
         if RBTree::is_node_red(&(*r).left) &&  RBTree::is_node_red(&(*r).right) {
-            println!("flipping colors");
+            println!("flipping colors of {:?} from {}", r.key, r.color);
             RBTree::flip_colors(&mut r);
         }
         r.size = Node::size(&r.right) + Node::size(&r.left) + 1;
@@ -164,7 +176,7 @@ impl<K:Ord+Clone,V> RBTree<K,V> {
     fn print_tree(root: &NodeptrT<K,V>, iter: usize) {
         if let Some(x) = root {
             RBTree::print_tree(&x.left, iter+1);
-            print!("--Iter{} : {:p}({}, {})--", iter, x, x.size, x.color);
+            print!("--Iter{}, {:?}:({},{})--", iter, x.key, x.size, x.color);
             RBTree::print_tree(&x.right, iter+1);
         } else {
             print!("--NULL--");
@@ -309,13 +321,13 @@ impl<K:Ord+Clone,V> RBTree<K,V> {
     fn is_23_helper(&self, xptr: &NodeptrT<K,V>) -> bool {
         if let Some(x) = xptr {
             if RBTree::is_node_red(&x.right) {
-                println!("Right node red");
+                println!("23Check: Right node red");
                 return false;
             }
             if RBTree::is_node_red(&xptr) && RBTree::is_node_red(&x.left) {
                 if let Some(ref y) = &self.root {
                     if y.key != x.key {
-                        println!("Not is root");
+                        println!("23Check: is not root");
                         return false;
                     }
                 }
