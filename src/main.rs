@@ -7,6 +7,9 @@ fn main() {
     for i in 0..70 {
         tree.insert(i, &x);
     }
+    for i in 0..10{
+        println!("Delete {}, {}", i, tree.delete(i));
+    }
     for i in 0..100 {
         let val = tree.find(&i);
         if let Some(v) = val {

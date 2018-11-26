@@ -85,9 +85,6 @@ impl<K:Ord+Clone+Debug,V> RBTree<K,V> {
    
 
     pub fn insert(&mut self, key: K, val: *const V) {
-        if let None = self.root.clone() {
-            println!("Clone is None");
-        }
         if let Some(new_root) = RBTree::put(self.root.clone(), key, val) {
             self.root = Some(new_root);
         }
@@ -99,9 +96,9 @@ impl<K:Ord+Clone+Debug,V> RBTree<K,V> {
     /***************************************************************************
     *  Delete.
     ***************************************************************************/
-    pub fn delete(&mut self, key: K) { 
+    pub fn delete(&mut self, key: K) -> bool { 
         if !self.contains(&key) {
-            return;
+            return false;
         }
 
         // if both children of root are black, set root to red
@@ -112,10 +109,12 @@ impl<K:Ord+Clone+Debug,V> RBTree<K,V> {
         }
 
         // delete and set new root
+        let size = self.size();
         self.root = self.delete_helper(&self.root, key);
         if let Some(ref mut r) = self.root {
             r.color = 0;
         } 
+        return self.size() < size;
     }
 
     fn move_red_left(h: &mut Box<Node<K,V>>) {
@@ -294,20 +293,16 @@ impl<K:Ord+Clone+Debug,V> RBTree<K,V> {
     }
 
     fn balance(rbox: &Box<Node<K,V>>, is_put: bool) -> Box<Node<K,V>> {
-        println!("balancing {:?}", rbox.key);
         let mut r = rbox.clone();
         if RBTree::is_node_red(&(*r).right) {
             if !is_put || (is_put && !RBTree::is_node_red(&(*r).left)) {
-                println!("rotate left {:?}", r.key);
                 RBTree::rotate_left(&mut r);
             }
         }
         if RBTree::is_node_red(&(*r).left) && RBTree::is_child_node_red(&(*r).left, 0) {
-            println!("rotate right {:?}", r.key);
             RBTree::rotate_right(&mut r);
         }
         if RBTree::is_node_red(&(*r).left) &&  RBTree::is_node_red(&(*r).right) {
-            println!("flipping colors of {:?} from {}", r.key, r.color);
             RBTree::flip_colors(&mut r);
         }
         r.size = Node::size(&r.right) + Node::size(&r.left) + 1;
@@ -352,7 +347,6 @@ impl<K:Ord+Clone+Debug,V> RBTree<K,V> {
         }
     }
  
-
     pub fn check(&self) -> bool {
         if !self.is_bst() {
             println!("Not in symmetric order");
@@ -370,6 +364,7 @@ impl<K:Ord+Clone+Debug,V> RBTree<K,V> {
             println!("Not balanced");
         }
         RBTree::print_tree(&self.root, 0);
+        println!("\n");
         return self.is_bst() 
             && self.is_size_consistent() 
             && self.is_rank_consistent() 
@@ -433,13 +428,11 @@ impl<K:Ord+Clone+Debug,V> RBTree<K,V> {
     fn is_23_helper(&self, xptr: &NodeptrT<K,V>) -> bool {
         if let Some(x) = xptr {
             if RBTree::is_node_red(&x.right) {
-                println!("23Check: Right node red");
                 return false;
             }
             if RBTree::is_node_red(&xptr) && RBTree::is_node_red(&x.left) {
                 if let Some(ref y) = &self.root {
                     if y.key != x.key {
-                        println!("23Check: is not root");
                         return false;
                     }
                 }
