@@ -42,8 +42,11 @@ impl<K:Ord+Clone, V> Node<K, V> {
         return self.color == 1;
     }
     
-    fn size(&self) -> usize {
-        return self.size;
+    fn size(node: &NodeptrT<K,V>) -> usize {
+        if let Some(n) = node {
+            return n.size;
+        }
+        return 0;
     }
 }
 
@@ -87,15 +90,12 @@ impl<K:Ord+Clone,V> RBTree<K,V> {
             let mut nodeptr_clone = nodeptr.clone();
             nodeptr_clone.right = xptr.left.clone();
             nodeptr_clone.color = 1;
-            if let Some(nptr_left) = nodeptr.left.clone() {
-                nodeptr_clone.size = nptr_left.size + nptr_right.size + 1;
-            } else {
-                nodeptr_clone.size = nptr_right.size + 1;
-            }                
+            nodeptr_clone.size = 
+                Node::size(&nodeptr_clone.left) + Node::size(&nodeptr_clone.right) + 1;
             
             xptr.left = Some(nodeptr_clone);
             xptr.color = nodeptr.color;
-            xptr.size = nodeptr.size;
+            xptr.size = Node::size(&xptr.right) + Node::size(&xptr.left) + 1;
             return xptr;
         } else {
             return nodeptr;
@@ -109,15 +109,12 @@ impl<K:Ord+Clone,V> RBTree<K,V> {
             let mut nodeptr_clone = nodeptr.clone();
             nodeptr_clone.left = xptr.right.clone();
             nodeptr_clone.color = 1;
-            if let Some(nptr_right) = nodeptr.right.clone() {
-                nodeptr_clone.size = nptr_left.size + nptr_right.size + 1;
-            } else {
-                nodeptr_clone.size = nptr_left.size + 1;
-            }
+            nodeptr_clone.size = 
+                Node::size(&nodeptr_clone.left) + Node::size(&nodeptr_clone.right) + 1;
             
             xptr.right = Some(nodeptr_clone);
             xptr.color = nodeptr.color;
-            xptr.size = nodeptr.size;
+            xptr.size = Node::size(&xptr.right) + Node::size(&xptr.left) + 1;
             return xptr;
         } else {
             return nodeptr;
@@ -148,34 +145,47 @@ impl<K:Ord+Clone,V> RBTree<K,V> {
         return r;
     }
 
-    fn put(root: NodeptrT<K,V>, key: K, val: *const V, iter: usize) -> NodeptrT<K,V> {
+    fn put(root: NodeptrT<K,V>, key: K, val: *const V) -> NodeptrT<K,V> {
         if let Some(mut r) = root {
             if key == (*r).key {
                 (*r).val = val;
             } else if key < (*r).key {
-                (*r).left = RBTree::put((*r).left.clone(), key, val, iter+1);
+                (*r).left = RBTree::put((*r).left.clone(), key, val);
             } else {
-                (*r).right = RBTree::put((*r).right.clone(), key, val, iter+1);
+                (*r).right = RBTree::put((*r).right.clone(), key, val);
             }
+            //println!("Balancing! {:p} {}", r, r.size);
             r = RBTree::balance(r, true); 
+            //println!("Balanced! {:p} {}", r, r.size);
             return Some(r);
         } else {
-            println!("New in iter! {}", iter);
             return Some(Box::new(Node::new(key, val, 1, 1)));
         }
     }
    
+    fn print_tree(root: &NodeptrT<K,V>) {
+        if let Some(x) = root {
+            RBTree::print_tree(&x.left);
+            print!("--{:p}(size {})--", x, x.size);
+            RBTree::print_tree(&x.right);
+        } else {
+            print!("--NULL--");
+        }
+    }
+ 
     pub fn insert(&mut self, key: K, val: *const V) {
         if let None = self.root.clone() {
             println!("Clone is None");
         }
-        if let Some(new_root) = RBTree::put(self.root.clone(), key, val, 0) {
+        if let Some(new_root) = RBTree::put(self.root.clone(), key, val) {
             self.root = Some(new_root);
-            println!("Inserted new root of size {}", self.size());
         }
         if let Some(ref mut rptr) = &mut self.root {
             (*rptr).color = 0;
         } 
+        println!("------PRINTING TREE-------");
+        RBTree::print_tree(&self.root);
+        println!("\n");
     }
 
     pub fn find(&self, key: K) -> Option<*const V> {
@@ -194,10 +204,6 @@ impl<K:Ord+Clone,V> RBTree<K,V> {
     }
 
     pub fn size(&self) -> usize {
-        if let Some(ref r) = self.root {
-            return r.size();
-        } else {
-            return 0;
-        }
+        return Node::size(&self.root);
     }
 }
