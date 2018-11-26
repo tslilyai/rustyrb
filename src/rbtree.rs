@@ -1,4 +1,5 @@
 use std::fmt::Debug;
+use std::mem;
 
 #[derive(Debug)]
 struct Node<K:Ord+Clone+Debug, V> {
@@ -248,7 +249,7 @@ impl<K:Ord+Clone+Debug,V> RBTree<K,V> {
     fn rotate_left(nodeptr: &mut Box<Node<K,V>>) {
         if let Some(mut xptr) = nodeptr.right.clone() {
             let mut nodeptr_clone = nodeptr.clone();
-            nodeptr_clone.right = xptr.left.clone();
+            mem::swap(&mut nodeptr_clone.right, &mut xptr.left);
             nodeptr_clone.color = 1;
             nodeptr_clone.size = 
                 Node::size(&nodeptr_clone.left) + Node::size(&nodeptr_clone.right) + 1;
@@ -263,7 +264,7 @@ impl<K:Ord+Clone+Debug,V> RBTree<K,V> {
     fn rotate_right(nodeptr: &mut Box<Node<K,V>>) {
         if let Some(mut xptr) = nodeptr.left.clone() {
             let mut nodeptr_clone = nodeptr.clone();
-            nodeptr_clone.left = xptr.right.clone();
+            mem::swap(&mut nodeptr_clone.left, &mut xptr.right);
             nodeptr_clone.color = 1;
             nodeptr_clone.size = 
                 Node::size(&nodeptr_clone.left) + Node::size(&nodeptr_clone.right) + 1;
